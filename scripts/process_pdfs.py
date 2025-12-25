@@ -9,20 +9,15 @@ TESTS_DIR = 'tests'
 MANIFEST_FILE = 'tests/test_manifest.json'
 
 def extract_text_from_pdf(pdf_path):
-    """
-    Extracts text and performs basic Page Number cleaning.
-    """
     text = ""
     try:
         with open(pdf_path, 'rb') as f:
             reader = PyPDF2.PdfReader(f)
             for page in reader.pages:
                 page_text = page.extract_text()
-                
-                # Remove Page Numbers (e.g., [24], [1], --- PAGE 2 ---)
+                # Remove Page Numbers
                 page_text = re.sub(r'\[\d+\]', '', page_text)
                 page_text = re.sub(r'---\s*PAGE\s*\d+\s*---', '', page_text)
-                
                 text += page_text + "\n"
     except Exception as e:
         print(f"❌ Error reading {pdf_path}: {e}")
@@ -30,77 +25,69 @@ def extract_text_from_pdf(pdf_path):
 
 def clean_garbage_text(text):
     """
-    Aggressively removes specific Headers and Footers to ensure they don't 
-    leak into Questions, Options, or Explanations.
+    Removes Forum IAS specific headers/footers to prevent leaking into questions.
     """
-    
     # 1. REMOVE LINES STARTING WITH "SFG 2026"
-    # (?m)^ matches the start of a line in multiline mode
     text = re.sub(r'(?m)^SFG 2026.*$', '', text)
 
-    # 2. HARDCODED FOOTER REMOVAL (Block Removal)
-    # Matches everything from "Forum Learning Centre" down to the last email "helpdesk@forumias.academy"
-    # re.DOTALL ensures .* matches newlines, covering the whole address block
+    # 2. HARDCODED FOOTER REMOVAL (Aggressive Block Removal)
+    # Matches from "Forum Learning Centre" down to "helpdesk@forumias.academy"
     footer_pattern = r'Forum\s+Learning\s+Centre\s*:.*?helpdesk@forumias\.academy'
     text = re.sub(footer_pattern, '', text, flags=re.DOTALL | re.IGNORECASE)
 
-    # 3. SAFETY CLEANUP (In case the block regex misses due to OCR typos)
-    # Remove specific unique strings from that footer
+    # 3. Specific Strings cleanup (Safety net)
     garbage_strings = [
-        "9311740400, 9311740900",
-        "https://academy.forumias.com",
-        "admissions@forumias.academy",
-        "helpdesk@forumias.academy",
-        "Plot No. 36, 4th Floor",
-        "Hyderabad - 1st & 2nd Floor, SM Plaza"
+        "9311740400, 9311740900", "https://academy.forumias.com",
+        "admissions@forumias.academy", "helpdesk@forumias.academy",
+        "Plot No. 36, 4th Floor", "Hyderabad - 1st & 2nd Floor, SM Plaza",
+        "Subtopic:)"
     ]
     for junk in garbage_strings:
         text = text.replace(junk, '')
 
-    # 4. Collapse extra newlines created by removals
+    # 4. Collapse extra newlines
     text = re.sub(r'\n{3,}', '\n\n', text)
-
     return text
 
-def format_explanation(text):
+def format_text_structure(text):
     """
-    Adds HTML formatting (Bold/Breaks) to make explanations readable.
+    Formats Question Text and Explanation to have proper line breaks 
+    for Statements (I, II) and Lists (1, 2).
     """
-    if not text: return "No explanation provided."
+    if not text: return ""
 
-    # Bold Keywords (Statement I, Hence, etc.)
-    keywords = [
-        "Statement I is correct", "Statement II is correct", 
-        "Statement 1 is correct", "Statement 2 is correct",
-        "Statement I is incorrect", "Statement II is incorrect",
-        "Statement 1 is incorrect", "Statement 2 is incorrect",
-        "Hence option .*? is correct", "Thus,", "Therefore,"
+    # 1. Format "Statement I:", "Statement 1:"
+    # Adds a double break before and bold tags
+    patterns = [
+        r"(Statement\s+[IVX]+[:\.]?)",  # Statement I
+        r"(Statement\s+\d+[:\.]?)"      # Statement 1
     ]
-    
-    for kw in keywords:
-        # Replace keyword with <br><br><b>keyword</b>
-        text = re.sub(f"(?i)({kw})", r'<br><br><b>\1</b>', text)
+    for pat in patterns:
+        text = re.sub(pat, r'<br><br><b>\1</b>', text, flags=re.IGNORECASE)
 
-    # Handle numbered lists (1. Text... 2. Text...)
-    text = re.sub(r'\n\s*(\d+\.)\s+', r'<br><b>\1</b> ', text)
+    # 2. Format Numbered Lists "1. ", "2. ", "I. ", "II. "
+    # Looks for Newline -> Number/Roman -> Dot/Paren
+    list_patterns = [
+        r'(?:\n|^)\s*(\d+[\.\)])\s+',       # 1. or 1)
+        r'(?:\n|^)\s*([IVX]+[\.\)])\s+',    # I. or I)
+        r'(?:\n|^)\s*([a-z][\.\)])\s+'      # a. or a) (rare in q-text but possible)
+    ]
+    for pat in list_patterns:
+        text = re.sub(pat, r'<br><b>\1</b> ', text)
 
-    # Clean up excessive breaks
+    # 3. Clean up messy breaks
     text = text.replace('<br><br><br>', '<br><br>')
+    if text.startswith('<br>'): text = text[4:]
     
     return text.strip()
 
 def parse_forum_ias(text):
-    # Step 1: Clean the global text first
     text = clean_garbage_text(text)
-    
     questions = []
     
-    # Step 2: Split text into Question Blocks
-    # Matches "Q.1)", "Q.1.", "Q. 1)"
+    # Split blocks by "Q.<number>)"
     blocks = re.split(r'\nQ\.\s*\d+[\)\.]', text)
-    
-    if len(blocks) > 0:
-        blocks = blocks[1:] # Skip preamble/title page text
+    if len(blocks) > 0: blocks = blocks[1:]
 
     for idx, block in enumerate(blocks):
         try:
@@ -108,21 +95,19 @@ def parse_forum_ias(text):
             if not block: continue
 
             # --- 1. EXTRACT EXPLANATION ---
-            # We extract this first to search for the answer inside it
             exp_match = re.search(r'(?:Exp|Explanation)[\)\:]\s*(.*)', block, re.DOTALL | re.IGNORECASE)
             explanation = exp_match.group(1).strip() if exp_match else ""
 
-            # --- 2. EXTRACT ANSWER ---
+            # --- 2. EXTRACT ANSWER (Robust) ---
             correct_idx = -1
             
-            # PRIORITY STRATEGY: Look for "Option c is the correct answer" inside Explanation
-            # This matches "Option c is..." or just "c is the correct answer" if "Option" is missing
+            # Priority: Look inside Explanation first
             exp_ans_match = re.search(r'(?:Option\s*)?([a-dA-D])\s+is\s+the\s+correct\s+answer', explanation, re.IGNORECASE)
             
             if exp_ans_match:
                 correct_char = exp_ans_match.group(1).lower()
             else:
-                # FALLBACK STRATEGY: Look for standard "Ans) c" tag
+                # Fallback: Look for "Ans) c" tag
                 ans_match = re.search(r'(?:Ans|Answer)[\)\:]\s*([a-dA-D])', block, re.IGNORECASE)
                 correct_char = ans_match.group(1).lower() if ans_match else None
 
@@ -130,51 +115,49 @@ def parse_forum_ias(text):
                 mapping = {'a': 0, 'b': 1, 'c': 2, 'd': 3}
                 correct_idx = mapping.get(correct_char, -1)
 
-            # --- 3. CLEAN UP EXPLANATION ---
-            # Remove the "Option c is the correct answer" sentence from the display text (optional, looks cleaner)
+            # --- 3. CLEAN & FORMAT EXPLANATION ---
+            # Remove the "Option c is correct" sentence from display
             explanation = re.sub(r'(?:Option\s*)?[a-dA-D]\s+is\s+the\s+correct\s+answer[\.\s]*', '', explanation, flags=re.IGNORECASE)
-            
-            # Remove Metadata tags if they appear in explanation
+            # Remove Metadata tags
             explanation = re.sub(r'(Subject:\)|Topic:\)|Source:\)).*', '', explanation, flags=re.DOTALL).strip()
-            
-            # Format nicely
-            explanation = format_explanation(explanation)
+            # Apply formatting
+            explanation = format_text_structure(explanation)
 
-            # --- 4. METADATA ---
+            # --- 4. EXTRACT METADATA ---
             subj_match = re.search(r'Subject:\)\s*(.*)', block)
             subject = subj_match.group(1).strip() if subj_match else "General"
-
             topic_match = re.search(r'Topic:\)\s*(.*)', block)
             topic = topic_match.group(1).strip() if topic_match else "GS"
 
             # --- 5. EXTRACT QUESTION TEXT & OPTIONS ---
-            # Find where options start (look for "a)" or "a.")
+            # Search for start of options (a) ... or A) ...)
             opt_start = re.search(r'\n\s*a[\)\.]', block)
             
             q_text = ""
             options = []
             
             if opt_start:
-                q_text = block[:opt_start.start()].strip()
-                
-                # Stop looking for options when we hit "Ans" or "Exp"
+                # Question Text is everything before options
+                raw_q_text = block[:opt_start.start()].strip()
+                q_text = format_text_structure(raw_q_text)
+
+                # Limit options block
                 marker_search = re.search(r'\n\s*(?:Ans|Exp)', block[opt_start.start():], re.IGNORECASE)
                 end_of_opts = (opt_start.start() + marker_search.start()) if marker_search else len(block)
-                
                 opts_block = block[opt_start.start():end_of_opts]
                 
-                # Extract options
+                # Regex for Options
                 opt_matches = list(re.finditer(r'(?:^|\n)\s*([a-dA-D])[\)\.]', opts_block))
                 for i in range(len(opt_matches)):
                     start = opt_matches[i].end()
                     end = opt_matches[i+1].start() if i + 1 < len(opt_matches) else len(opts_block)
                     options.append(opts_block[start:end].strip())
             else:
-                q_text = "Error parsing question text."
+                q_text = "Error parsing question."
                 options = ["Parse Error", "Parse Error", "Parse Error", "Parse Error"]
 
-            # Pad options if parsing failed
-            while len(options) < 4: options.append("-")
+            # Ensure 4 options exist to prevent "undefined"
+            while len(options) < 4: options.append("Option Missing in PDF")
 
             q_obj = {
                 "id": idx + 1,
@@ -201,7 +184,6 @@ def update_manifest(filename, test_name):
         except:
             manifest = []
 
-    # Avoid duplicate entries
     found = False
     for entry in manifest:
         if entry['filename'] == filename:
@@ -217,13 +199,11 @@ def update_manifest(filename, test_name):
 
 def main():
     if not os.path.exists(UPLOAD_DIR):
-        print(f"Directory {UPLOAD_DIR} missing. Creating...")
         os.makedirs(UPLOAD_DIR)
         return
     if not os.path.exists(TESTS_DIR):
         os.makedirs(TESTS_DIR)
 
-    files_processed = 0
     for f in os.listdir(UPLOAD_DIR):
         if f.endswith('.pdf'):
             print(f"Processing {f}...")
@@ -238,14 +218,7 @@ def main():
                 test_title = f.replace('.pdf', '').replace('-', ' ').replace('_', ' ')
                 update_manifest(out_name, test_title)
                 print(f"✅ Generated {out_name} ({len(questions)} Qs)")
-                
                 os.remove(os.path.join(UPLOAD_DIR, f))
-                files_processed += 1
-            else:
-                print(f"⚠️ No questions parsed from {f}")
-
-    if files_processed == 0:
-        print("No PDF files found in uploads/ folder.")
 
 if __name__ == "__main__":
     main()
