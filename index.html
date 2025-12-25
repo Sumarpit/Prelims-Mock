@@ -1,0 +1,294 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0, maximum-scale=1.0, user-scalable=no, viewport-fit=cover">
+    <title>UPSC Prelims Prep</title>
+    <link rel="manifest" href="manifest.json">
+    <style>
+        :root {
+            --header-bg: #2c3e50; /* UPSC Official Blue-Grey tone */
+            --bg-color: #f8f9fa;
+            --card-bg: #ffffff;
+            --text-color: #333;
+            --accent: #d35400; /* Orange accent for visibility */
+            --correct: #27ae60;
+            --wrong: #c0392b;
+            --cloud: #3498db;
+            --footer-height: 80px;
+        }
+
+        * { box-sizing: border-box; margin: 0; padding: 0; font-family: 'Segoe UI', Roboto, Helvetica, Arial, sans-serif; }
+        
+        body { 
+            height: 100dvh; width: 100vw; overflow: hidden; 
+            background: var(--bg-color); display: flex; flex-direction: column;
+            color: var(--text-color);
+        }
+
+        /* --- SCREENS --- */
+        .screen { display: none; height: 100%; width: 100%; flex-direction: column; }
+        #upload-screen.active, #result-screen.active { display: block; overflow-y: auto; }
+        #exam-screen.active { display: flex; } 
+
+        /* --- UI COMPONENTS --- */
+        .container-box { max-width: 900px; margin: 20px auto; padding: 0 20px 160px 20px; }
+        
+        .filter-bar { margin-bottom: 20px; background: white; padding: 15px; border-radius: 8px; box-shadow: 0 2px 5px rgba(0,0,0,0.05); }
+        .search-box { width: 100%; padding: 12px; border: 1px solid #ddd; border-radius: 6px; font-size: 1rem; margin-bottom: 10px; }
+        .tabs { display: flex; gap: 10px; }
+        .tab-btn { flex: 1; padding: 10px; border: none; background: #eee; border-radius: 4px; cursor: pointer; font-weight: 600; color: #555; transition: 0.2s; }
+        .tab-btn.active { background: var(--accent); color: white; }
+
+        .library-box { background: var(--card-bg); padding: 25px; border-radius: 10px; box-shadow: 0 4px 12px rgba(0,0,0,0.05); text-align: center; margin-bottom: 20px; }
+        
+        .file-grid { display: grid; grid-template-columns: repeat(auto-fill, minmax(160px, 1fr)); gap: 15px; margin-top: 20px; }
+        .file-card { background: #fff; border: 1px solid #eee; padding: 15px; border-radius: 8px; cursor: pointer; transition: 0.2s; box-shadow: 0 2px 5px rgba(0,0,0,0.05); text-align: left; min-height: 120px; display: flex; flex-direction: column; justify-content: center; position: relative; overflow: hidden; }
+        .file-card:hover { transform: translateY(-3px); border-color: var(--accent); box-shadow: 0 5px 15px rgba(0,0,0,0.1); }
+        .file-card.active { border: 2px solid var(--accent); background: #fff5e6; }
+        .file-card.cloud { border-left: 4px solid var(--cloud); }
+        
+        .file-name { font-weight: 600; font-size: 0.95rem; line-height: 1.4; margin-bottom: 5px; color: #2c3e50; }
+        .file-meta { font-size: 0.8rem; color: #7f8c8d; }
+
+        /* --- EXAM INTERFACE --- */
+        header { height: 60px; background: var(--header-bg); color: white; display: flex; align-items: center; justify-content: space-between; padding: 0 20px; flex-shrink: 0; z-index: 100; box-shadow: 0 2px 10px rgba(0,0,0,0.2); }
+        .header-title { font-size: 1.2rem; font-weight: 700; letter-spacing: 0.5px; }
+        .timer { font-family: 'Courier New', monospace; font-weight: 700; background: rgba(0,0,0,0.3); padding: 5px 12px; border-radius: 4px; font-size: 1.1rem; border: 1px solid rgba(255,255,255,0.2); }
+
+        .exam-layout { display: flex; flex: 1; overflow: hidden; background: #e9ecef; }
+        .pane-question { flex: 1; background: #fff; padding: 30px; overflow-y: auto; max-width: 900px; margin: 0 auto; width: 100%; box-shadow: 0 0 20px rgba(0,0,0,0.05); }
+        
+        .q-meta { font-size: 0.9rem; color: #7f8c8d; margin-bottom: 15px; display: flex; justify-content: space-between; font-weight: 600; border-bottom: 2px solid #f0f0f0; padding-bottom: 10px; text-transform: uppercase; letter-spacing: 0.5px; }
+        .q-text { font-size: 1.25rem; margin-bottom: 25px; line-height: 1.7; font-weight: 500; color: #2c3e50; }
+        
+        .opt-label { display: flex; align-items: flex-start; padding: 15px; border: 1px solid #e0e0e0; margin-bottom: 12px; border-radius: 8px; cursor: pointer; transition: all 0.2s ease; background: #fff; }
+        .opt-label:hover { background: #f8f9fa; border-color: #bdc3c7; }
+        .opt-label.selected { background: #e8f6f3; border-color: var(--correct); box-shadow: inset 0 0 0 1px var(--correct); }
+        .opt-label input { margin-right: 15px; margin-top: 5px; accent-color: var(--correct); transform: scale(1.2); }
+        .opt-text { font-size: 1.05rem; line-height: 1.5; color: #34495e; }
+
+        /* --- FOOTER & BUTTONS --- */
+        .fixed-footer { position: fixed; bottom: 0; left: 0; width: 100%; background: #fff; border-top: 1px solid #ddd; padding: 15px 20px; display: grid; grid-template-columns: 1fr 1fr; gap: 20px; align-items: center; box-shadow: 0 -4px 15px rgba(0,0,0,0.1); z-index: 200; }
+        .start-btn { width: 100%; height: 55px; background: var(--accent); color: white; font-weight: 700; border: none; border-radius: 8px; font-size: 1.1rem; cursor: pointer; text-transform: uppercase; letter-spacing: 1px; transition: 0.2s; }
+        .start-btn:hover { background: #e67e22; }
+        .start-btn:disabled { background: #bdc3c7; cursor: not-allowed; }
+
+        .btn-group { display: flex; gap: 15px; justify-content: flex-end; }
+        button.primary { background: var(--accent); color: white; padding: 12px 25px; border-radius: 6px; border: none; font-weight: 600; cursor: pointer; font-size: 1rem; }
+        button.nav { background: white; border: 1px solid #ccc; color: #333; padding: 10px 20px; border-radius: 6px; cursor: pointer; font-weight: 600; }
+
+        /* --- RESPONSIVE --- */
+        @media (max-width: 768px) {
+            .pane-question { padding: 20px; }
+            .q-text { font-size: 1.1rem; }
+            .fixed-footer { padding: 10px; grid-template-columns: 1fr; gap: 10px; }
+            .footer-left { display: none; } /* Hide config on mobile to save space */
+        }
+    </style>
+</head>
+<body>
+
+<div id="upload-screen" class="screen active">
+    <div class="container-box">
+        <div class="filter-bar">
+            <input type="text" class="search-box" id="searchInput" placeholder="🔍 Search Prelims Tests..." onkeyup="renderGrid()">
+            <div class="tabs">
+                <button class="tab-btn active" onclick="setTab('all')">All</button>
+                <button class="tab-btn" onclick="setTab('cloud')">Cloud (GitHub)</button>
+            </div>
+        </div>
+
+        <div class="library-box">
+            <h1 style="font-size:1.5rem; margin-bottom: 10px; color: var(--header-bg);">UPSC Prelims Library</h1>
+            <p style="color: #7f8c8d; margin-bottom: 20px;">Upload PDF to <b>/uploads</b> folder in GitHub to auto-convert.</p>
+            <div id="file-grid" class="file-grid">Loading...</div>
+        </div>
+    </div>
+
+    <div class="fixed-footer">
+        <div class="footer-left" style="display:flex; gap:10px; align-items:center;">
+            <strong style="color:#555;">Timer:</strong>
+            <input type="number" id="hInput" value="02" style="width:50px; padding:5px; text-align:center; border:1px solid #ccc; border-radius:4px;"> h
+            <input type="number" id="mInput" value="00" style="width:50px; padding:5px; text-align:center; border:1px solid #ccc; border-radius:4px;"> m
+        </div>
+        <div class="footer-right">
+            <button class="start-btn" id="start-btn" onclick="startExam()" disabled>SELECT TEST</button>
+        </div>
+    </div>
+</div>
+
+<div id="exam-screen" class="screen">
+    <header>
+        <div class="header-title">UPSC Prelims Mock</div>
+        <div class="timer" id="timer">02:00:00</div>
+    </header>
+    <div class="exam-layout">
+        <div class="pane-question">
+            <div class="q-meta">
+                <span id="q-topic">General Studies</span>
+                <span>Q. <span id="q-num">1</span></span>
+            </div>
+            <div class="q-text" id="q-text">Loading...</div>
+            <div id="options-box"></div>
+            
+            <div style="margin-top: 30px; display: flex; justify-content: space-between;">
+                <button class="nav" onclick="prevQ()">❮ Previous</button>
+                <button class="primary" onclick="nextQ()">Save & Next ❯</button>
+            </div>
+        </div>
+    </div>
+</div>
+
+<script>
+    // --- CONFIG ---
+    let library = {}, currentTest = [], currIdx = 0, timerInterval;
+    let responses = {};
+
+    // --- INITIALIZATION ---
+    window.onload = () => {
+        loadCloudManifest();
+    };
+
+    function loadCloudManifest() {
+        fetch('tests/test_manifest.json')
+            .then(res => res.json())
+            .then(data => {
+                library = data; // Expected format: [{name: "Test 1", filename: "test1.json"}, ...]
+                renderGrid();
+            })
+            .catch(err => {
+                document.getElementById('file-grid').innerHTML = '<p style="color:red">Failed to load manifest. Push JSONs to tests/ folder.</p>';
+            });
+    }
+
+    function renderGrid() {
+        const grid = document.getElementById('file-grid');
+        grid.innerHTML = '';
+        const search = document.getElementById('searchInput').value.toLowerCase();
+
+        library.forEach(file => {
+            if (!file.name.toLowerCase().includes(search)) return;
+            
+            const card = document.createElement('div');
+            card.className = 'file-card cloud';
+            card.innerHTML = `
+                <div class="file-name">${file.name}</div>
+                <div class="file-meta">Cloud File</div>
+            `;
+            card.onclick = () => selectFile(card, file.filename);
+            grid.appendChild(card);
+        });
+    }
+
+    let selectedFilename = '';
+    function selectFile(el, filename) {
+        document.querySelectorAll('.file-card').forEach(c => c.classList.remove('active'));
+        el.classList.add('active');
+        selectedFilename = filename;
+        document.getElementById('start-btn').disabled = false;
+        document.getElementById('start-btn').innerText = "START: " + filename.replace('.json','');
+    }
+
+    async function startExam() {
+        if (!selectedFilename) return;
+        
+        try {
+            const res = await fetch(`tests/${selectedFilename}`);
+            currentTest = await res.json();
+            
+            if (!currentTest || currentTest.length === 0) {
+                alert("Test file is empty.");
+                return;
+            }
+
+            // Switch Screen
+            document.getElementById('upload-screen').classList.remove('active');
+            document.getElementById('exam-screen').classList.add('active');
+            
+            // Start Timer
+            let h = parseInt(document.getElementById('hInput').value) || 2;
+            let m = parseInt(document.getElementById('mInput').value) || 0;
+            startTimer(h * 3600 + m * 60);
+            
+            currIdx = 0;
+            loadQuestion(0);
+        } catch (e) {
+            alert("Error loading test: " + e.message);
+        }
+    }
+
+    function loadQuestion(idx) {
+        const q = currentTest[idx];
+        document.getElementById('q-num').innerText = idx + 1;
+        
+        // Handle "Topic" if present in JSON, else default
+        document.getElementById('q-topic').innerText = q.topic || "General Studies";
+        
+        // Render Text (Convert newlines to <br>)
+        document.getElementById('q-text').innerHTML = q.text.replace(/\n/g, '<br>');
+
+        const optBox = document.getElementById('options-box');
+        optBox.innerHTML = '';
+
+        q.options.forEach((opt, i) => {
+            const row = document.createElement('div');
+            row.className = 'opt-label';
+            if (responses[idx] === i) row.classList.add('selected');
+            
+            row.innerHTML = `
+                <input type="radio" name="opt" ${responses[idx] === i ? 'checked' : ''}>
+                <div class="opt-text">${opt}</div>
+            `;
+            row.onclick = () => {
+                responses[idx] = i;
+                loadQuestion(idx); // Re-render to update styling
+            };
+            optBox.appendChild(row);
+        });
+    }
+
+    function nextQ() {
+        if (currIdx < currentTest.length - 1) {
+            currIdx++;
+            loadQuestion(currIdx);
+        }
+    }
+
+    function prevQ() {
+        if (currIdx > 0) {
+            currIdx--;
+            loadQuestion(currIdx);
+        }
+    }
+
+    function startTimer(duration) {
+        let timer = duration, hours, minutes, seconds;
+        const display = document.getElementById('timer');
+        timerInterval = setInterval(function () {
+            hours = parseInt(timer / 3600, 10);
+            minutes = parseInt((timer % 3600) / 60, 10);
+            seconds = parseInt(timer % 60, 10);
+
+            hours = hours < 10 ? "0" + hours : hours;
+            minutes = minutes < 10 ? "0" + minutes : minutes;
+            seconds = seconds < 10 ? "0" + seconds : seconds;
+
+            display.textContent = hours + ":" + minutes + ":" + seconds;
+
+            if (--timer < 0) {
+                clearInterval(timerInterval);
+                alert("Time's up!");
+            }
+        }, 1000);
+    }
+    
+    function setTab(mode) {
+        document.querySelectorAll('.tab-btn').forEach(b => b.classList.remove('active'));
+        event.target.classList.add('active');
+        // Simplified for this demo: always show grid
+    }
+</script>
+</body>
+  </html>
+  
