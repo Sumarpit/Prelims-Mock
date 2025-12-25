@@ -386,16 +386,15 @@
         </div>
     </div>
 </div>
-
 <script>
     // --- USER CONFIG ---
     const REPO_OWNER = "Sumarpit";
-    const REPO_NAME = "UPSC-Prelims-Mock-Tool"; // Updated for Context
+    const REPO_NAME = "UPSC-Prelims-Mock-Tool"; 
     
     // --- VARIABLES ---
-    const KEY = 'upsc_prelims_data'; // Updated Key
-    const HIST = 'upsc_prelims_hist'; // Updated History
-    const LIB_KEY = 'upsc_prelims_library'; // Updated Library
+    const KEY = 'upsc_prelims_data'; 
+    const HIST = 'upsc_prelims_hist'; 
+    const LIB_KEY = 'upsc_prelims_library'; 
     
     let library = {}, cloudList = [], activeFile = '', questions = [], currIdx = 0;
     let responses = {}, confidence = {}, visited = {};
@@ -454,6 +453,7 @@
                 saveLibraryToStorage();
                 
                 activeFile = fileName;
+                // Re-render grid: This hides the cloud tile and shows the local tile
                 renderGrid();
                 
                 let shortName = fileName.replace(/\.json$/i,'').substring(0,10) + (fileName.length>10?'...':'');
@@ -496,7 +496,7 @@
         }
     }
 
-    // --- ISSUE OPS CLOUD SAVE (COPY TO CLIPBOARD) ---
+    // --- ISSUE OPS CLOUD SAVE ---
     function saveToCloud() {
         const name = document.getElementById('pasteFileName').value.trim();
         const content = document.getElementById('pasteContent').value.trim();
@@ -506,14 +506,10 @@
         
         try { JSON.parse(content); } catch(e) { alert("Cannot save: Invalid JSON code."); return; }
 
-        // Copy to clipboard
         navigator.clipboard.writeText(content).then(() => {
             const fileName = name.endsWith('.json') ? name : name + '.json';
             const label = "new-test"; 
-            
-            // Open Issue with just Title and Label
             const title = encodeURIComponent(fileName);
-            // We do NOT put body in URL to avoid length error
             const url = `https://github.com/${REPO_OWNER}/${REPO_NAME}/issues/new?title=${title}&labels=${label}`;
             
             alert("Code copied to Clipboard! \n\n1. A new GitHub tab will open.\n2. PASTE (Ctrl+V) the code into the description.\n3. Click 'Submit New Issue'.");
@@ -537,6 +533,7 @@
         
         let displayList = [];
 
+        // 1. Process Local Files
         if (currentTab === 'all' || currentTab === 'local') {
             Object.keys(library).forEach(name => {
                 if(name.toLowerCase().includes(search)) {
@@ -545,18 +542,22 @@
             });
         }
 
+        // 2. Process Cloud Files
         if (currentTab === 'all' || currentTab === 'cloud') {
             cloudList.forEach(item => {
                 let name = item.name || item.filename || item;
                 if (typeof item === 'string') name = item.split('/').pop();
                 const path = item.filename ? `tests/${item.filename}` : item;
                 
+                // --- FIX: Check if we ALREADY have this file in local library ---
+                // If we do, do NOT add it to the display list as a cloud item.
                 if(!library[name] && name.toLowerCase().includes(search)) { 
                     displayList.push({ type: 'cloud', name: name, path: path });
                 }
             });
         }
 
+        // 3. Render
         displayList.forEach(item => {
             const d = document.createElement('div');
             if (item.type === 'local') {
@@ -676,7 +677,7 @@
         const h = parseInt(document.getElementById('hInput').value)||0;
         const m = parseInt(document.getElementById('mInput').value)||0;
         const s = parseInt(document.getElementById('sInput').value)||0;
-        seconds = (h*3600)+(m*60)+s || 7200; // Default 2 hours for UPSC
+        seconds = (h*3600)+(m*60)+s || 7200; 
         initExamUI();
     }
 
@@ -742,8 +743,9 @@
         document.getElementById('q-num').innerText = i+1;
         document.getElementById('q-sec').innerText = q.section || '-';
         document.getElementById('q-topic').innerText = q.topic || '-';
-        // --- FIX: USE INNERHTML FOR RICH TEXT ---
-        document.getElementById('q-text').innerHTML = q.question || q.text || "Question Text"; // Support both formats
+        
+        // Use innerHTML to render the formatted text (with <br> and <b>)
+        document.getElementById('q-text').innerHTML = q.question || q.text || "Question Text";
 
         const box = document.getElementById('options-box'); box.innerHTML = '';
         q.options.forEach((opt, idx) => {
@@ -811,15 +813,6 @@
 
     function checkResume() { if(localStorage.getItem(KEY)) document.getElementById('resume-btn').style.display = 'inline-block'; }
 
-    function resumeExam() {
-        const d = JSON.parse(localStorage.getItem(KEY));
-        loadLibraryFromStorage();
-        activeFile = d.activeFile; questions = d.questions;
-        responses = d.responses; confidence = d.confidence; visited = d.visited;
-        currIdx = d.currIdx; seconds = d.seconds; isReviewMode = d.isReviewMode;
-        initExamUI();
-    }
-
     function submitExam(force=false) {
         if(!force && !confirm("End Exam?")) return;
         clearInterval(timer); localStorage.removeItem(KEY);
@@ -829,7 +822,6 @@
         
         reviewSet = [];
 
-        // RADIOS for MODE
         const radios = document.getElementsByName('pMode');
         let mode = 'auto';
         for(let r of radios) { if(r.checked) mode = r.value; }
@@ -846,14 +838,14 @@
 
             if (mode === '2') { // CSAT
                 qMark = 2.5; 
-                qNeg = 0.8333; // 1/3rd of 2.5
+                qNeg = 0.8333; 
                 modeLabel = "Forced CSAT (+2.5 / -0.83)";
             } else if (mode === '1') { // GS 1
                 qMark = 2.0; 
-                qNeg = 0.6666; // 1/3rd of 2.0
+                qNeg = 0.6666; 
                 modeLabel = "Forced GS Paper 1 (+2.0 / -0.66)";
             } else {
-                qMark = q.marks ? parseFloat(q.marks) : 2.0; // Default to GS 1 standard if auto
+                qMark = q.marks ? parseFloat(q.marks) : 2.0; 
                 qNeg = q.negative ? parseFloat(q.negative) : (qMark * 0.3333);
                 modeLabel = "Auto-Detected from JSON";
             }
@@ -889,7 +881,7 @@
         
         const reviewBtn = document.getElementById('smart-review-btn');
         if(reviewSet.length > 0) {
-            reviewBtn.style.display = 'flex'; // Changed to flex for alignment
+            reviewBtn.style.display = 'flex'; 
             reviewBtn.innerText = "Smart Review";
         } else {
             reviewBtn.style.display = 'none';
@@ -923,6 +915,9 @@
                 else { cls='wrong'; uAns=q.options[ans]; status='Wrong'; }
             }
             
+            // Format Explanation with HTML breaks for display in result
+            let formattedExp = q.explanation ? q.explanation.replace(/\n/g, '<br>') : "No explanation";
+
             rev.innerHTML += `
                 <div class="review-item ${cls}">
                     <div style="display:flex; justify-content:space-between; align-items:center; margin-bottom:10px; padding-bottom:5px; border-bottom:1px solid #eee;">
@@ -935,7 +930,7 @@
                         Ans: <span class="txt-green">${q.options[q.answer]}</span>
                     </div>
                     <div style="margin-top:10px; padding:10px; background:#f9f9f9; font-size:0.9rem; border-radius:4px;">
-                        <b>Exp:</b> ${q.explanation}
+                        <b>Exp:</b> ${formattedExp}
                     </div>
                 </div>`;
         });
