@@ -3,254 +3,418 @@
 <head>
     <meta charset="UTF-8">
     <meta name="viewport" content="width=device-width, initial-scale=1.0, maximum-scale=1.0, user-scalable=no">
-    <title>UPSC Prelims SFG</title>
+    <title>UPSC Prelims Mock</title>
     <link rel="manifest" href="manifest.json">
     <style>
         :root {
-            --header-bg: #2c3e50;
-            --accent: #d35400; /* Burnt Orange */
+            --primary: #2c3e50;
+            --accent: #e67e22;
+            --bg: #f4f7f6;
+            --card-bg: #ffffff;
+            --text: #333;
             --correct: #27ae60;
             --wrong: #c0392b;
-            --bg-color: #f4f6f7;
+            --border: #e0e0e0;
         }
-        body { margin: 0; font-family: 'Segoe UI', Roboto, sans-serif; background: var(--bg-color); height: 100vh; display: flex; flex-direction: column; overflow: hidden; }
 
-        /* SCREENS */
-        .screen { display: none; height: 100%; flex-direction: column; }
+        * { box-sizing: border-box; -webkit-tap-highlight-color: transparent; }
+        body { font-family: 'Segoe UI', Roboto, Helvetica, Arial, sans-serif; background: var(--bg); margin: 0; color: var(--text); height: 100vh; display: flex; flex-direction: column; }
+
+        /* --- LAYOUT UTILS --- */
+        .screen { display: none; height: 100%; flex-direction: column; overflow-y: auto; }
         .screen.active { display: flex; }
+        .container { max-width: 800px; margin: 0 auto; width: 100%; padding: 20px; padding-bottom: 80px; }
+        .header { background: var(--primary); color: white; padding: 15px 20px; font-weight: 600; font-size: 1.2rem; display: flex; justify-content: space-between; align-items: center; box-shadow: 0 2px 5px rgba(0,0,0,0.1); }
+        
+        /* --- HOME SCREEN --- */
+        .section-title { font-size: 1rem; color: #7f8c8d; margin: 25px 0 10px 0; text-transform: uppercase; letter-spacing: 1px; font-weight: 700; border-bottom: 2px solid #eee; padding-bottom: 5px; }
+        
+        .card { background: var(--card-bg); border-radius: 8px; padding: 15px; margin-bottom: 12px; box-shadow: 0 2px 4px rgba(0,0,0,0.05); border: 1px solid var(--border); display: flex; justify-content: space-between; align-items: center; transition: transform 0.2s; }
+        .card:hover { transform: translateY(-2px); border-color: var(--primary); }
+        
+        .upload-box { border: 2px dashed #bdc3c7; background: #ecf0f1; text-align: center; padding: 20px; border-radius: 8px; cursor: pointer; color: #7f8c8d; font-weight: 600; margin-bottom: 20px; }
+        .upload-box:hover { border-color: var(--accent); color: var(--accent); background: #fff; }
 
-        /* DASHBOARD */
-        .dashboard { padding: 20px; overflow-y: auto; max-width: 800px; margin: 0 auto; width: 100%; }
-        .test-card { background: white; padding: 20px; margin-bottom: 15px; border-radius: 8px; box-shadow: 0 2px 5px rgba(0,0,0,0.05); cursor: pointer; border-left: 5px solid var(--accent); display: flex; justify-content: space-between; align-items: center; }
-        .test-card:hover { transform: translateY(-2px); box-shadow: 0 5px 15px rgba(0,0,0,0.1); }
-        .test-title { font-weight: 600; font-size: 1.1rem; color: #34495e; }
-        .test-meta { font-size: 0.85rem; color: #7f8c8d; margin-top: 5px; }
+        .history-badge { background: #eee; padding: 4px 8px; border-radius: 4px; font-size: 0.85rem; font-weight: bold; }
+        .score-good { color: var(--correct); background: #e8f8f5; }
+        .score-bad { color: var(--wrong); background: #fdedec; }
 
-        /* EXAM INTERFACE */
-        header { background: var(--header-bg); color: white; padding: 0 20px; height: 60px; display: flex; align-items: center; justify-content: space-between; flex-shrink: 0; }
-        .timer-box { font-family: monospace; font-size: 1.2rem; background: rgba(0,0,0,0.3); padding: 5px 10px; border-radius: 4px; }
+        /* --- EXAM SCREEN --- */
+        .q-card { background: white; padding: 20px; border-radius: 8px; box-shadow: 0 2px 8px rgba(0,0,0,0.05); margin-bottom: 20px; }
+        .q-meta { display: flex; justify-content: space-between; margin-bottom: 15px; color: #7f8c8d; font-size: 0.9rem; font-weight: 600; }
+        .q-text { font-size: 1.15rem; line-height: 1.6; margin-bottom: 20px; white-space: pre-wrap; }
         
-        .question-area { flex: 1; overflow-y: auto; padding: 20px; display: flex; justify-content: center; }
-        .q-container { background: white; max-width: 800px; width: 100%; padding: 30px; border-radius: 8px; box-shadow: 0 2px 10px rgba(0,0,0,0.05); height: fit-content; }
+        .option { padding: 12px 15px; border: 1px solid var(--border); border-radius: 6px; margin-bottom: 10px; cursor: pointer; display: flex; gap: 10px; align-items: flex-start; transition: 0.1s; }
+        .option:hover { background: #f9f9f9; border-color: #95a5a6; }
+        .option.selected { background: #ebf5fb; border-color: var(--primary); border-left: 4px solid var(--primary); }
         
-        .badges { display: flex; gap: 10px; margin-bottom: 15px; flex-wrap: wrap; }
-        .badge { font-size: 0.75rem; padding: 4px 8px; border-radius: 4px; background: #ecf0f1; color: #7f8c8d; font-weight: 600; text-transform: uppercase; }
+        /* Floating Footer */
+        .floating-footer { position: fixed; bottom: 0; left: 0; width: 100%; background: white; padding: 10px 20px; border-top: 1px solid #ddd; display: flex; justify-content: space-between; align-items: center; box-shadow: 0 -2px 10px rgba(0,0,0,0.1); z-index: 100; height: 70px; }
+        .timer { font-family: monospace; font-size: 1.4rem; font-weight: 700; color: var(--primary); }
+        
+        .btn { padding: 10px 20px; border: none; border-radius: 6px; font-weight: 600; cursor: pointer; font-size: 1rem; transition: 0.2s; }
+        .btn-primary { background: var(--accent); color: white; }
+        .btn-primary:active { transform: scale(0.98); }
+        .btn-sec { background: #eee; color: #333; }
+        .btn-danger { background: var(--wrong); color: white; }
 
-        .q-text { font-size: 1.15rem; line-height: 1.6; color: #2c3e50; margin-bottom: 25px; font-weight: 500; }
-        
-        .option { padding: 15px; border: 1px solid #e0e0e0; border-radius: 6px; margin-bottom: 10px; cursor: pointer; transition: 0.2s; display: flex; align-items: flex-start; gap: 10px; }
-        .option:hover { background: #f9f9f9; border-color: #bdc3c7; }
-        .option.selected { background: #eef2f3; border-color: var(--header-bg); border-left: 4px solid var(--header-bg); }
-        
-        /* RESULT STATES */
-        .option.correct { background: #d4efdf; border-color: var(--correct); }
-        .option.incorrect { background: #fadbd8; border-color: var(--wrong); }
-        
-        .explanation-box { margin-top: 25px; padding: 20px; background: #fff8e1; border-left: 4px solid #f1c40f; border-radius: 4px; display: none; }
-        .exp-title { font-weight: 700; margin-bottom: 10px; font-size: 0.9rem; text-transform: uppercase; color: #d35400; }
-        .exp-text { font-size: 0.95rem; line-height: 1.6; color: #444; white-space: pre-wrap; }
-
-        footer { background: white; border-top: 1px solid #eee; padding: 15px 20px; display: flex; justify-content: space-between; align-items: center; flex-shrink: 0; }
-        .btn { padding: 10px 24px; border: none; border-radius: 6px; font-weight: 600; cursor: pointer; font-size: 1rem; }
-        .btn-primary { background: var(--header-bg); color: white; }
-        .btn-secondary { background: #ecf0f1; color: #333; }
-        .btn-toggle { background: transparent; color: var(--accent); border: 1px solid var(--accent); }
+        /* --- EXPLANATION (Result Mode) --- */
+        .exp-box { background: #fef9e7; border-left: 4px solid #f1c40f; padding: 15px; margin-top: 20px; display: none; border-radius: 4px; }
+        .option.correct { background: #d4efdf !important; border-color: var(--correct) !important; }
+        .option.wrong { background: #fadbd8 !important; border-color: var(--wrong) !important; }
 
     </style>
 </head>
 <body>
 
-    <div id="screen-list" class="screen active">
-        <header>
-            <div style="font-weight:700; font-size:1.2rem;">UPSC SFG Library</div>
-        </header>
-        <div class="dashboard" id="test-grid">
-            <div style="text-align:center; margin-top:50px; color:#7f8c8d;">Loading available tests...</div>
+<div id="home-screen" class="screen active">
+    <div class="header">
+        <span>UPSC Mock Tool</span>
+        <span style="font-size:0.8rem; opacity:0.8;">v2.0</span>
+    </div>
+    
+    <div class="container">
+        <div class="section-title">Quick Start</div>
+        <div class="upload-box" onclick="document.getElementById('fileInput').click()">
+            📂 Upload JSON File to Attempt
+            <input type="file" id="fileInput" accept=".json" style="display:none" onchange="handleFileUpload(this)">
+        </div>
+
+        <div class="section-title">Test Library</div>
+        <div id="library-list">
+            <div style="text-align:center; padding:20px; color:#999;">Loading tests...</div>
+        </div>
+
+        <div class="section-title">Recent History (Last 10)</div>
+        <div id="history-list">
+            <div style="text-align:center; padding:10px; color:#bbb; font-size:0.9rem;">No tests taken yet.</div>
+        </div>
+        
+        <div style="text-align:center; margin-top:30px;">
+            <button class="btn btn-sec" style="font-size:0.8rem;" onclick="clearHistory()">Clear History</button>
         </div>
     </div>
+</div>
 
-    <div id="screen-exam" class="screen">
-        <header>
-            <button onclick="goHome()" style="background:none; border:none; color:white; cursor:pointer;">✕ Quit</button>
-            <div class="timer-box" id="timer">02:00:00</div>
-            <div style="font-size:0.9rem; font-weight:600;"><span id="curr-q">1</span> / <span id="total-q">100</span></div>
-        </header>
-        
-        <div class="question-area">
-            <div class="q-container">
-                <div class="badges">
-                    <span class="badge" id="badge-subject">Subject</span>
-                    <span class="badge" id="badge-topic">Topic</span>
-                </div>
-                <div class="q-text" id="q-text">Loading...</div>
-                <div id="options-container"></div>
-                
-                <div class="explanation-box" id="explanation-box">
-                    <div class="exp-title">Explanation & Source</div>
-                    <div class="exp-text" id="exp-text"></div>
-                </div>
+<div id="exam-screen" class="screen">
+    <div class="header">
+        <span id="exam-title">Test Name</span>
+        <button onclick="endTest()" class="btn btn-danger" style="padding:5px 10px; font-size:0.8rem;">Quit</button>
+    </div>
+
+    <div class="container" style="padding-bottom:100px;"> <div class="q-card">
+            <div class="q-meta">
+                <span id="q-subject">Subject</span>
+                <span>Q. <span id="q-num">1</span> / <span id="q-total">100</span></span>
+            </div>
+            <div class="q-text" id="q-text">Question text goes here...</div>
+            <div id="options-box"></div>
+            
+            <div class="exp-box" id="exp-box">
+                <strong style="color:#d35400;">Explanation:</strong><br>
+                <span id="exp-text"></span>
             </div>
         </div>
-
-        <footer>
-            <button class="btn btn-secondary" onclick="nav(-1)">Previous</button>
-            <button class="btn btn-toggle" onclick="toggleSolution()">Show Solution</button>
-            <button class="btn btn-primary" onclick="nav(1)">Next</button>
-        </footer>
     </div>
 
+    <div class="floating-footer">
+        <div class="timer" id="timer">02:00:00</div>
+        <div>
+            <button class="btn btn-sec" onclick="nav(-1)">Prev</button>
+            <button class="btn btn-primary" onclick="nav(1)" id="next-btn">Next</button>
+        </div>
+    </div>
+</div>
+
 <script>
-    let tests = [];
-    let currentTest = [];
-    let currentQIdx = 0;
-    let userAnswers = {}; // { 0: 1, 1: 3 } (QuestionIndex: OptionIndex)
-    let showSolutions = {}; // { 0: true }
+    // --- STATE ---
+    let db = { tests: [], history: [] };
+    let currentTest = { name: "", data: [] };
+    let state = { idx: 0, answers: {}, status: 'idle', timer: 7200 };
     let timerInterval;
 
-    // --- INITIALIZATION ---
-    window.onload = async () => {
-        try {
-            // Include a timestamp to prevent caching of the manifest
-            const res = await fetch(`tests/test_manifest.json?t=${new Date().getTime()}`);
-            if(!res.ok) throw new Error("No tests found");
-            tests = await res.json();
-            renderList();
-        } catch(e) {
-            document.getElementById('test-grid').innerHTML = 
-                `<div style="text-align:center; padding:20px;">
-                    <h3>No Tests Found</h3>
-                    <p>Upload a Forum IAS PDF to the <code>uploads/</code> folder in GitHub to generate tests.</p>
-                </div>`;
-        }
+    // --- INIT ---
+    window.onload = () => {
+        loadHistory();
+        fetchManifest();
     };
 
-    function renderList() {
-        const grid = document.getElementById('test-grid');
-        grid.innerHTML = '';
-        tests.forEach(test => {
-            const div = document.createElement('div');
-            div.className = 'test-card';
-            div.innerHTML = `
-                <div>
-                    <div class="test-title">${test.name}</div>
-                    <div class="test-meta">Filename: ${test.filename}</div>
-                </div>
-                <div style="color:var(--accent); font-weight:bold;">START ➤</div>
-            `;
-            div.onclick = () => loadTest(test.filename);
-            grid.appendChild(div);
-        });
+    // --- LIBRARY FUNCTIONS ---
+    async function fetchManifest() {
+        try {
+            // Fetch the manifest generated by GitHub Actions
+            const res = await fetch(`tests/test_manifest.json?t=${Date.now()}`);
+            if(!res.ok) throw new Error("Manifest not found");
+            const list = await res.json();
+            
+            const container = document.getElementById('library-list');
+            container.innerHTML = '';
+            
+            if(list.length === 0) {
+                container.innerHTML = '<div style="padding:15px; color:#777;">No tests in library. Upload PDFs to GitHub.</div>';
+                return;
+            }
+
+            list.forEach(test => {
+                const div = document.createElement('div');
+                div.className = 'card';
+                div.innerHTML = `
+                    <div>
+                        <div style="font-weight:600;">${test.name}</div>
+                        <div style="font-size:0.8rem; color:#888;">${test.filename}</div>
+                    </div>
+                    <button class="btn btn-primary" style="padding:6px 15px; font-size:0.9rem;" onclick="loadCloudTest('${test.filename}', '${test.name}')">Start</button>
+                `;
+                container.appendChild(div);
+            });
+        } catch (e) {
+            document.getElementById('library-list').innerHTML = '<div style="padding:15px; color:red;">Could not load library. (Are you running locally?)</div>';
+        }
     }
 
-    async function loadTest(filename) {
+    function handleFileUpload(input) {
+        const file = input.files[0];
+        if (!file) return;
+        const reader = new FileReader();
+        reader.onload = (e) => {
+            try {
+                const json = JSON.parse(e.target.result);
+                startExam(file.name.replace('.json',''), json);
+            } catch (err) {
+                alert("Invalid JSON file.");
+            }
+        };
+        reader.readAsText(file);
+        input.value = ''; // Reset
+    }
+
+    async function loadCloudTest(filename, name) {
         try {
             const res = await fetch(`tests/${filename}`);
-            currentTest = await res.json();
-            
-            currentQIdx = 0;
-            userAnswers = {};
-            showSolutions = {};
-            
-            document.getElementById('total-q').innerText = currentTest.length;
-            document.getElementById('screen-list').classList.remove('active');
-            document.getElementById('screen-exam').classList.add('active');
-            
-            startTimer(2 * 60 * 60); // 2 hours
-            renderQuestion();
+            const json = await res.json();
+            startExam(name, json);
         } catch(e) {
-            alert("Error loading test file.");
+            alert("Failed to download test file.");
         }
+    }
+
+    // --- EXAM LOGIC ---
+    function startExam(name, data) {
+        if(!data || data.length === 0) return alert("Test is empty!");
+        
+        currentTest = { name: name, data: data };
+        state = { idx: 0, answers: {}, status: 'active', timer: 7200 }; // 2 hours default
+        
+        document.getElementById('home-screen').classList.remove('active');
+        document.getElementById('exam-screen').classList.add('active');
+        document.getElementById('exam-title').innerText = name;
+        document.getElementById('q-total').innerText = data.length;
+        
+        // Reset UI
+        document.getElementById('next-btn').innerText = "Next";
+        
+        startTimer();
+        renderQuestion();
     }
 
     function renderQuestion() {
-        const q = currentTest[currentQIdx];
-        document.getElementById('curr-q').innerText = currentQIdx + 1;
+        const q = currentTest.data[state.idx];
+        const isResultMode = state.status === 'review';
+
+        document.getElementById('q-num').innerText = state.idx + 1;
+        document.getElementById('q-subject').innerText = q.subject || (q.topic || "General");
+        document.getElementById('q-text').innerText = q.text;
         
-        // Update Text
-        document.getElementById('q-text').innerHTML = q.text.replace(/\n/g, '<br>');
-        
-        // Update Badges
-        document.getElementById('badge-subject').innerText = q.subject || "General";
-        document.getElementById('badge-topic').innerText = q.topic || "GS";
-        
-        // Explanation logic
-        const expBox = document.getElementById('explanation-box');
-        const expText = document.getElementById('exp-text');
-        
-        // Show explanation if user previously toggled it OR if they answered (optional auto-show)
-        if(showSolutions[currentQIdx]) {
+        // Explanation visibility
+        const expBox = document.getElementById('exp-box');
+        if(isResultMode) {
             expBox.style.display = 'block';
-            expText.innerHTML = q.explanation ? q.explanation.replace(/\n/g, '<br>') : "No explanation provided.";
+            document.getElementById('exp-text').innerText = q.explanation || "No explanation provided.";
         } else {
             expBox.style.display = 'none';
         }
 
         // Options
-        const optCont = document.getElementById('options-container');
-        optCont.innerHTML = '';
+        const box = document.getElementById('options-box');
+        box.innerHTML = '';
         
-        q.options.forEach((opt, idx) => {
+        q.options.forEach((opt, i) => {
             const div = document.createElement('div');
             div.className = 'option';
             
-            // Visual logic for selected/correct/wrong
-            const isSelected = userAnswers[currentQIdx] === idx;
-            const isCorrect = q.correctAnswer === idx;
-            const showingSol = showSolutions[currentQIdx];
+            const userSelected = state.answers[state.idx] === i;
+            const isCorrect = q.correctAnswer === i;
 
-            if(isSelected) div.classList.add('selected');
-            
-            // Reveal colors if solution is toggled
-            if(showingSol) {
+            if(userSelected) div.classList.add('selected');
+
+            // Result Styling
+            if(isResultMode) {
                 if(isCorrect) div.classList.add('correct');
-                if(isSelected && !isCorrect) div.classList.add('incorrect');
+                if(userSelected && !isCorrect) div.classList.add('wrong');
+                div.style.cursor = 'default';
+            } else {
+                // Interaction
+                div.onclick = () => {
+                    state.answers[state.idx] = i;
+                    renderQuestion(); // Re-render to update selection
+                };
             }
 
             div.innerHTML = `
-                <div style="font-weight:bold; color:#7f8c8d;">${String.fromCharCode(65+idx)}.</div>
-                <div>${opt}</div>
+                <span style="font-weight:bold; color:#777;">${String.fromCharCode(65+i)}.</span>
+                <span>${opt}</span>
             `;
-            
-            div.onclick = () => {
-                if(!showingSol) { // Lock answer if solution shown? Optional. Currently allows changing.
-                    userAnswers[currentQIdx] = idx;
-                    renderQuestion();
-                }
-            };
-            optCont.appendChild(div);
+            box.appendChild(div);
         });
-    }
 
-    function toggleSolution() {
-        showSolutions[currentQIdx] = true;
-        renderQuestion();
+        // Next Button Text logic
+        const btn = document.getElementById('next-btn');
+        if(state.idx === currentTest.data.length - 1) {
+            btn.innerText = isResultMode ? "Home" : "Submit";
+        } else {
+            btn.innerText = "Next";
+        }
     }
 
     function nav(dir) {
-        const newIdx = currentQIdx + dir;
-        if(newIdx >= 0 && newIdx < currentTest.length) {
-            currentQIdx = newIdx;
+        // Submit Logic if on last question
+        if(dir === 1 && state.idx === currentTest.data.length - 1) {
+            if(state.status === 'active') {
+                if(confirm("Submit Test?")) submitTest();
+            } else {
+                goHome(); // Return home after review
+            }
+            return;
+        }
+
+        const newIdx = state.idx + dir;
+        if(newIdx >= 0 && newIdx < currentTest.data.length) {
+            state.idx = newIdx;
             renderQuestion();
         }
     }
 
-    function startTimer(seconds) {
+    function submitTest() {
         clearInterval(timerInterval);
-        const display = document.getElementById('timer');
-        let timer = seconds;
-        timerInterval = setInterval(() => {
-            let h = Math.floor(timer / 3600);
-            let m = Math.floor((timer % 3600) / 60);
-            let s = timer % 60;
-            display.innerText = `${h}:${m<10?'0'+m:m}:${s<10?'0'+s:s}`;
-            if(--timer < 0) clearInterval(timerInterval);
-        }, 1000);
+        state.status = 'review';
+        
+        // Calculate Score
+        let correct = 0;
+        let attempted = 0;
+        currentTest.data.forEach((q, i) => {
+            if(state.answers[i] !== undefined) {
+                attempted++;
+                if(state.answers[i] === q.correctAnswer) correct++;
+            }
+        });
+
+        const score = (correct * 2) - ((attempted - correct) * 0.66); // UPSC Standard
+        alert(`Test Submitted!\nScore: ${score.toFixed(2)} / ${currentTest.data.length * 2}\nCorrect: ${correct}\nAttempted: ${attempted}`);
+
+        // Save to History
+        saveHistory({
+            name: currentTest.name,
+            score: score.toFixed(2),
+            total: currentTest.data.length * 2,
+            date: new Date().toLocaleDateString()
+        });
+
+        // Show Review Mode starting from Q1
+        state.idx = 0;
+        document.getElementById('exam-title').innerText = `Review: ${currentTest.name}`;
+        renderQuestion();
+    }
+
+    function endTest() {
+        if(confirm("Exit without saving?")) goHome();
     }
 
     function goHome() {
-        if(confirm("Exit exam? Progress will be lost.")) {
-            document.getElementById('screen-exam').classList.remove('active');
-            document.getElementById('screen-list').classList.add('active');
+        clearInterval(timerInterval);
+        document.getElementById('exam-screen').classList.remove('active');
+        document.getElementById('home-screen').classList.add('active');
+    }
+
+    // --- TIMER ---
+    function startTimer() {
+        clearInterval(timerInterval);
+        const display = document.getElementById('timer');
+        timerInterval = setInterval(() => {
+            let h = Math.floor(state.timer / 3600);
+            let m = Math.floor((state.timer % 3600) / 60);
+            let s = state.timer % 60;
+            
+            display.innerText = `${h<10?'0'+h:h}:${m<10?'0'+m:m}:${s<10?'0'+s:s}`;
+            
+            if(state.timer <= 0) {
+                clearInterval(timerInterval);
+                alert("Time's up!");
+                submitTest();
+            }
+            state.timer--;
+        }, 1000);
+    }
+
+    // --- HISTORY SYSTEM ---
+    function saveHistory(entry) {
+        let hist = JSON.parse(localStorage.getItem('upsc_history') || "[]");
+        hist.unshift(entry);
+        if(hist.length > 10) hist.pop(); // Keep last 10
+        localStorage.setItem('upsc_history', JSON.stringify(hist));
+        loadHistory();
+    }
+
+    function loadHistory() {
+        const list = document.getElementById('history-list');
+        const hist = JSON.parse(localStorage.getItem('upsc_history') || "[]");
+        
+        if(hist.length === 0) return;
+        
+        list.innerHTML = '';
+        hist.forEach((h, i) => {
+            const div = document.createElement('div');
+            div.className = 'card';
+            
+            // Color code score
+            const percentage = (h.score / h.total) * 100;
+            const badgeClass = percentage >= 50 ? 'score-good' : 'score-bad';
+
+            div.innerHTML = `
+                <div>
+                    <div style="font-weight:600;">${h.name}</div>
+                    <div style="font-size:0.8rem; color:#888;">${h.date}</div>
+                </div>
+                <div style="display:flex; align-items:center; gap:10px;">
+                    <span class="history-badge ${badgeClass}">${h.score} / ${h.total}</span>
+                    <button class="btn btn-sec" style="font-size:0.8rem; padding:5px 10px;" onclick="retakeHistory('${h.name}')">Retake</button>
+                </div>
+            `;
+            list.appendChild(div);
+        });
+    }
+
+    function clearHistory() {
+        if(confirm("Clear all history?")) {
+            localStorage.removeItem('upsc_history');
+            document.getElementById('history-list').innerHTML = '<div style="text-align:center; padding:10px; color:#bbb;">No tests taken yet.</div>';
+        }
+    }
+
+    // Retake logic: try to find the file in library or alert user to upload
+    async function retakeHistory(testName) {
+        // First, check if it exists in the manifest (Library)
+        try {
+            const res = await fetch(`tests/test_manifest.json?t=${Date.now()}`);
+            const list = await res.json();
+            const found = list.find(t => t.name === testName);
+            
+            if(found) {
+                loadCloudTest(found.filename, found.name);
+            } else {
+                alert(`Test "${testName}" not found in Library. Please upload the JSON manually.`);
+            }
+        } catch(e) {
+            alert("Could not search library. Please upload file manually.");
         }
     }
 </script>
